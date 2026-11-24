@@ -76,3 +76,33 @@ def synth_whoosh(out_path: Path) -> Path:
     kernel = np.ones(18) / 18.0
     smooth_noise = np.convolve(noise, kernel, mode="same") * env * 0.7
     return _save_wav(out_path, body + smooth_noise)
+
+
+def synth_police_siren(out_path: Path, dur: float = 8.0) -> Path:
+    """Authentic dual-tone sweeping siren for police raid and emergency scenes."""
+    t = np.linspace(0, dur, int(SAMPLE_RATE * dur), endpoint=False)
+    siren_freq = 820 + 220 * np.sin(2 * np.pi * 1.35 * t)
+    phase = 2 * np.pi * np.cumsum(siren_freq) / SAMPLE_RATE
+    carrier = np.sin(phase)
+    harmonic = np.sin(phase * 2) * 0.22
+    audio = (carrier + harmonic) * 0.42
+    fade_in = np.clip(t / 0.35, 0.0, 1.0)
+    audio = audio * fade_in
+    return _save_wav(out_path, audio)
+
+
+def synth_suspense_bed(out_path: Path, dur: float = 60.0) -> Path:
+    """Cinematic suspense pulse & sub-bass rhythm (100 BPM) with ticking tension."""
+    t = np.linspace(0, dur, int(SAMPLE_RATE * dur), endpoint=False)
+    # Deep sub drone (46Hz F#1 + 55Hz A1)
+    drone = 0.22 * np.sin(2 * np.pi * 46.25 * t) + 0.14 * np.sin(2 * np.pi * 55.0 * t)
+    # 100 BPM kick pulse (every 0.6s)
+    beat_dur = 60.0 / 100.0
+    beat_idx = (t % beat_dur) / beat_dur
+    kick = np.sin(2 * np.pi * (52.0 * np.exp(-15.0 * beat_idx))) * np.exp(-7.0 * beat_idx) * 0.32
+    # Subtle ticking tension
+    tick_dur = beat_dur / 2.0
+    tick_idx = (t % tick_dur) / tick_dur
+    noise = np.random.uniform(-0.1, 0.1, len(t)) * np.exp(-42.0 * tick_idx)
+    mix = drone + kick + noise
+    return _save_wav(out_path, mix)

@@ -199,3 +199,62 @@ def apply_whip_transition(prev_frame: Image.Image, next_frame: Image.Image, prog
     # Next scene slides in from right
     out.paste(next_frame, (w - shift, 0))
     return out
+
+
+def draw_sweat_drops(frame: Image.Image, x: int, y: int, t: float) -> Image.Image:
+    """Draws nervous cartoon blue sweat droplets popping and dripping near a character's temple."""
+    overlay = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    drop_y1 = y + int((t * 40) % 25)
+    drop_y2 = y + 14 + int(((t + 0.3) * 35) % 20)
+    # Droplet 1
+    d.polygon([(x, drop_y1 - 10), (x - 7, drop_y1 + 4), (x + 7, drop_y1 + 4)], fill=(56, 189, 248, 230))
+    d.ellipse([x - 7, drop_y1 - 3, x + 7, drop_y1 + 11], fill=(56, 189, 248, 230), outline=(2, 132, 199, 255), width=2)
+    # Droplet 2
+    d.polygon([(x + 18, drop_y2 - 7), (x + 13, drop_y2 + 3), (x + 23, drop_y2 + 3)], fill=(56, 189, 248, 200))
+    d.ellipse([x + 13, drop_y2 - 2, x + 23, drop_y2 + 8], fill=(56, 189, 248, 200), outline=(2, 132, 199, 255), width=2)
+    return Image.alpha_composite(frame, overlay)
+
+
+def draw_anger_mark(frame: Image.Image, cx: int, cy: int, scale: float = 1.0) -> Image.Image:
+    """Draws dynamic anime/cartoon red anger vein cross mark (💢) popping over an enraged character."""
+    overlay = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    s = int(24 * scale)
+    red = (239, 68, 68, 245)
+    w = max(3, int(5 * scale))
+    d.arc([cx - s, cy - s, cx, cy], start=180, end=360, fill=red, width=w)
+    d.arc([cx, cy - s, cx + s, cy], start=180, end=360, fill=red, width=w)
+    d.arc([cx - s, cy, cx, cy + s], start=0, end=180, fill=red, width=w)
+    d.arc([cx, cy, cx + s, cy + s], start=0, end=180, fill=red, width=w)
+    return Image.alpha_composite(frame, overlay)
+
+
+def draw_door_burst_particles(frame: Image.Image, t_local: float) -> Image.Image:
+    """Explosive wooden splinter particles & entry shockwave when doors are kicked open."""
+    if t_local > 0.65 or t_local < 0.0:
+        return frame
+    w, h = frame.size
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    prog = t_local / 0.65
+    alpha = int((1.0 - prog) * 230)
+
+    # White impact entry flash
+    if prog < 0.25:
+        flash_a = int((1.0 - prog / 0.25) * 140)
+        d.rectangle([(0, 0), (w, h)], fill=(255, 255, 255, flash_a))
+
+    # Flying wood splinter particles bursting from doorway (x=160, y=1150)
+    origin_x, origin_y = 180, 1150
+    for i in range(24):
+        angle = -0.5 + (i * 0.04)  # flying towards right
+        speed = 380 + (i * 47) % 600
+        dist = speed * prog
+        px = origin_x + int(math.cos(angle) * dist)
+        py = origin_y + int(math.sin(angle) * dist) + int(550 * (prog ** 2))
+        pw = 8 + (i % 3) * 6
+        ph = 14 + (i % 4) * 8
+        d.rectangle([(px, py), (px + pw, py + ph)], fill=(180, 83, 9, alpha), outline=(120, 53, 15, alpha), width=2)
+
+    return Image.alpha_composite(frame, overlay)

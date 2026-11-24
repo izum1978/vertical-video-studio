@@ -46,13 +46,16 @@ from backend.app.cartoon.crypto_scene import (
 )
 from backend.app.cartoon.effects import (
     apply_whip_transition,
+    draw_anger_mark,
     draw_animated_stamp,
+    draw_door_burst_particles,
     draw_money_rain,
     draw_siren_flash,
+    draw_sweat_drops,
     ease_out_back,
 )
 from backend.app.cartoon.f5_voice import is_f5_available, synthesize_f5_script
-from backend.app.cartoon.sfx import synth_whoosh
+from backend.app.cartoon.sfx import synth_police_siren, synth_suspense_bed, synth_whoosh
 from backend.app.cartoon.silero_voice import synthesize_silero_script
 from backend.app.cartoon.v3_engine import (
     FONT_BOLD,
@@ -559,8 +562,12 @@ def build_catalytic_converter_sprite() -> Image.Image:
 
     # Yellow service sticker with "№ 42-А" (Anya's unique proof mark!)
     d.rounded_rectangle([(cx - 35 * S, cy - 22 * S), (cx + 35 * S, cy + 22 * S)], radius=4 * S, fill=(250, 204, 21, 255), outline=INK, width=3 * S)
-    f_stk = _font(FONT_BOLD, 14 * S)
-    d.text((cx - 24 * S, cy - 10 * S), "№ 42-A", fill=INK, font=f_stk)
+    f_stk = _font(FONT_BOLD, 15 * S)
+    stk_t = "№ 42-А"
+    sb = f_stk.getbbox(stk_t)
+    tw = sb[2] - sb[0]
+    th = sb[3] - sb[1]
+    d.text((cx - tw // 2, cy - th // 2 - sb[1]), stk_t, fill=INK, font=f_stk)
 
     return img.resize((340, 180), Image.Resampling.LANCZOS)
 
@@ -772,17 +779,42 @@ def build_autoservice_backgrounds() -> Dict[str, Image.Image]:
     d.rounded_rectangle([(ph_x + 40 * S, card_y), (ph_x + ph_w - 40 * S, card_y + 860 * S)], radius=16 * S, fill=(255, 255, 255, 255), outline=(226, 232, 240, 255), width=4 * S)
 
     # Photo area of the part
-    d.rounded_rectangle([(ph_x + 60 * S, card_y + 20 * S), (ph_x + ph_w - 60 * S, card_y + 440 * S)], radius=12 * S, fill=(241, 245, 249, 255))
+    photo_box = [(ph_x + 60 * S, card_y + 20 * S), (ph_x + ph_w - 60 * S, card_y + 440 * S)]
+    d.rounded_rectangle(photo_box, radius=12 * S, fill=(241, 245, 249, 255))
     cat_spr = build_catalytic_converter_sprite()
-    cat_spr_lg = cat_spr.resize((int(cat_spr.width * 1.8), int(cat_spr.height * 1.8)), Image.Resampling.LANCZOS)
-    img.paste(cat_spr_lg, (ph_x + 110 * S, card_y + 60 * S), cat_spr_lg)
+    scale = 2.4
+    cat_w = int(cat_spr.width * scale)
+    cat_h = int(cat_spr.height * scale)
+    cat_spr_lg = cat_spr.resize((cat_w, cat_h), Image.Resampling.LANCZOS)
+
+    cx_target = ph_x + ph_w // 2
+    cy_target = card_y + 220 * S
+    cat_x = cx_target - cat_w // 2
+    cat_y = cy_target - cat_h // 2
+    img.paste(cat_spr_lg, (cat_x, cat_y), cat_spr_lg)
     d = ImageDraw.Draw(img)
 
-    # Red pulsing circle around the yellow sticker: "УЛИКА!"
-    d.ellipse([ph_x + 360 * S, card_y + 150 * S, ph_x + 500 * S, card_y + 290 * S], outline=(239, 68, 68, 255), width=6 * S)
-    d.polygon([(ph_x + 490 * S, card_y + 270 * S), (ph_x + 560 * S, card_y + 340 * S), (ph_x + 520 * S, card_y + 350 * S)], fill=(239, 68, 68, 255))
-    d.rounded_rectangle([(ph_x + 520 * S, card_y + 325 * S), (ph_x + 720 * S, card_y + 375 * S)], radius=8 * S, fill=(239, 68, 68, 255))
-    d.text((ph_x + 535 * S, card_y + 338 * S), "ЕЁ НАКЛЕЙКА!", fill=(255, 255, 255, 255), font=_font(FONT_BOLD, 18 * S))
+    # Red callout circle centered directly on the yellow sticker
+    stk_x = cx_target
+    stk_y = cy_target
+    r = 75 * S
+    d.ellipse([stk_x - r, stk_y - r, stk_x + r, stk_y + r], outline=(239, 68, 68, 255), width=6 * S)
+
+    # Pointer arrow & badge "ЕЁ НАКЛЕЙКА!"
+    pt_x = stk_x + int(r * 0.707)
+    pt_y = stk_y + int(r * 0.707)
+    bg_x = pt_x + 40 * S
+    bg_y = pt_y + 30 * S
+    badge_w = 230 * S
+    badge_h = 56 * S
+    d.polygon([(pt_x, pt_y), (bg_x + 20 * S, bg_y + 10 * S), (bg_x, bg_y + 35 * S)], fill=(239, 68, 68, 255))
+    d.rounded_rectangle([(bg_x, bg_y), (bg_x + badge_w, bg_y + badge_h)], radius=10 * S, fill=(239, 68, 68, 255))
+    f_badge = _font(FONT_BOLD, 22 * S)
+    badge_txt = "ЕЁ НАКЛЕЙКА!"
+    bb_b = f_badge.getbbox(badge_txt)
+    tx = bg_x + (badge_w - (bb_b[2] - bb_b[0])) // 2
+    ty = bg_y + (badge_h - (bb_b[3] - bb_b[1])) // 2 - bb_b[1]
+    d.text((tx, ty), badge_txt, fill=(255, 255, 255, 255), font=f_badge)
 
     # Listing Details
     f_price = _font(FONT_IMPACT, 52 * S)
@@ -1297,6 +1329,44 @@ def render_autoservice_episode(
     vs = np.frombuffer(raw_v, dtype=np.int16).astype(np.float32) / 32768.0
     master[:min(len(vs), total_samples)] += vs[:min(len(vs), total_samples)]
 
+    # --- NEXT-GEN SOUND DESIGN (EPISODE 4 BETA) ---
+    if ep_num == 4:
+        # 1. Suspense beat background music with audio ducking
+        bed_path = synth_suspense_bed(sfx_dir / "suspense_bed.wav", duration + 1.0)
+        with wave.open(str(bed_path), "rb") as wf:
+            bed_data = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+
+        v_len = min(len(vs), total_samples)
+        hop = sr // 10  # 100ms chunks
+        duck_gain = np.full(total_samples, 0.22, dtype=np.float32)
+        for k in range(0, v_len, hop):
+            block = np.abs(vs[k:min(k + hop, v_len)])
+            if len(block) > 0 and np.mean(block) > 0.035:
+                duck_gain[k:min(k + hop, total_samples)] = 0.09  # quiet ducking during speech
+
+        b_len = min(len(bed_data), total_samples)
+        master[:b_len] += bed_data[:b_len] * duck_gain[:b_len]
+
+        # 2. Rich Foley events from backend/assets/sfx/
+        assets_sfx = PROJECT_ROOT / "backend" / "assets" / "sfx"
+        if (assets_sfx / "clock_tick.wav").exists():
+            sfx_events.append((ch_starts[0] + 0.25, assets_sfx / "clock_tick.wav", 0.40))
+        if (assets_sfx / "impact.wav").exists():
+            sfx_events.append((ch_starts[1] + 0.35, assets_sfx / "impact.wav", 0.70))
+        if (assets_sfx / "heartbeat.wav").exists():
+            sfx_events.append((ch_starts[1] + 0.55, assets_sfx / "heartbeat.wav", 0.55))
+        if (assets_sfx / "tension_riser.wav").exists():
+            sfx_events.append((ch_starts[2] + 0.15, assets_sfx / "tension_riser.wav", 0.65))
+        if (assets_sfx / "door_slam.wav").exists():
+            sfx_events.append((ch_starts[3], assets_sfx / "door_slam.wav", 0.90))
+        if (assets_sfx / "sub_boom.wav").exists():
+            sfx_events.append((ch_starts[3] + 0.04, assets_sfx / "sub_boom.wav", 0.85))
+
+        # Police siren during scene 4:
+        siren_dur = duration - ch_starts[3] + 0.5
+        siren_path = synth_police_siren(sfx_dir / "police_siren.wav", siren_dur)
+        sfx_events.append((ch_starts[3], siren_path, 0.28))
+
     for ts, sf_path, vol in sfx_events:
         if sf_path.exists():
             with wave.open(str(sf_path), "rb") as wf:
@@ -1484,49 +1554,73 @@ def render_autoservice_episode(
                 draw_smart_bubble(frame, "«Вот видео подмены!\nТеперь пора наказывать!»", anchor_x=340, anchor_y=800, align="left", pop_scale=pop_late)
 
         # ================================================================
-        # EPISODE 4: ОЧНАЯ СТАВКА И ШТУРМ ОБЭП
+        # EPISODE 4: ОЧНАЯ СТАВКА И ШТУРМ ОБЭП (BETA NEXT-GEN)
         # ================================================================
         elif sid == "as4_s1":
             # Director counting cash: "Did you bring 480k?"
+            bob_a = int(math.sin(t * 3.1) * 3)
+            bob_d = int(math.sin(t * 2.8 + 1.2) * 3)
+            talk_d = int(math.sin(t * 7.5) * 3.5) if mouth != "closed" else 0
             dir_boss = render_director(mood="smug", mouth_state=mouth, gesture="point_right", blink=blink, facing="left", holding_bill=False, scale=0.95)
             anya = render_anya(mood="confident", mouth_state="closed", gesture="relax", blink=blink, facing="right", scale=0.92)
-            frame = paste_char(frame, anya, 270, 1305)
-            frame = paste_char(frame, dir_boss, 840, 1305)
+            frame = paste_char(frame, anya, 270, 1305 + bob_a)
+            frame = paste_char(frame, dir_boss, 840, 1305 + bob_d + talk_d)
             frame = camera.apply(frame, zoom=1.01 + 0.05 * p_ch, focal_point=(540, 980), t=t)
             if t_local > 0.45:
                 draw_smart_bubble(frame, "«Ну что, принесла 480 тысяч?\nИли тачка в утиль?»", anchor_x=790, anchor_y=790, align="right", pop_scale=pop_late)
 
         elif sid == "as4_s2":
             # Anya slams phone with voice recorder & Avito sheet on desk
+            bob_a = int(math.sin(t * 3.1) * 3)
+            bob_d = int(math.sin(t * 2.8 + 1.2) * 3)
+            talk_a = int(math.sin(t * 7.5) * 3.5) if mouth != "closed" else 0
             anya = render_anya(mood="confident", mouth_state=mouth, gesture="point_right", blink=blink, facing="right", holding_phone=True, scale=0.94)
             dir_boss = render_director(mood="shocked", mouth_state="closed", gesture="relax", blink=False, facing="left", holding_bill=True, scale=0.94)
-            frame = paste_char(frame, anya, 280, 1305)
-            frame = paste_char(frame, dir_boss, 830, 1305)
+            frame = paste_char(frame, anya, 280, 1305 + bob_a + talk_a)
+            frame = paste_char(frame, dir_boss, 830, 1305 + bob_d)
+            # Director cold sweat beads dripping in shock!
+            frame = draw_sweat_drops(frame, 895, 1010, t_local)
             frame = camera.apply(frame, zoom=1.02 + 0.05 * p_ch, focal_point=(540, 980), t=t)
             if t_local > 0.4:
                 draw_smart_bubble(frame, "«Вы украли мой катализатор\nи вымогаете деньги!»", anchor_x=340, anchor_y=790, align="left", pop_scale=pop_late)
 
         elif sid == "as4_s3":
             # Director rages: "Who are you gonna complain to?!", Anya smiles
+            bob_a = int(math.sin(t * 3.1) * 3)
+            # Director shaking with furious rage
+            rage_x = int(math.sin(t * 28.0) * 4)
+            rage_y = int(math.cos(t * 22.0) * 2)
+            talk_d = int(math.sin(t * 9.0) * 4) if mouth != "closed" else 0
             dir_boss = render_director(mood="shady", mouth_state=mouth, gesture="point_right", blink=blink, facing="left", scale=0.95)
             anya = render_anya(mood="smug", mouth_state="closed", gesture="point_right", blink=blink, facing="right", scale=0.92)
-            frame = paste_char(frame, anya, 270, 1305)
-            frame = paste_char(frame, dir_boss, 840, 1305)
+            frame = paste_char(frame, anya, 270, 1305 + bob_a)
+            frame = paste_char(frame, dir_boss, 840 + rage_x, 1305 + rage_y + talk_d)
+            # Cartoon red anger cross 💢 popping over director's head
+            frame = draw_anger_mark(frame, 865 + rage_x, 990, scale=1.15)
             frame = camera.apply(frame, zoom=1.01 + 0.05 * p_ch, focal_point=(540, 980), t=t)
             if t_local > 0.45:
                 draw_smart_bubble(frame, "«А вы следователям ОБЭП\nэто скажите за дверью!»", anchor_x=340, anchor_y=790, align="left", pop_scale=pop_late)
 
         elif sid == "as4_s4":
             # Police raid! OBEP Captain storms in with squad
+            bob_c = int(math.sin(t * 3.1) * 3)
+            bob_d = int(math.sin(t * 2.8 + 1.2) * 3)
+            talk_c = int(math.sin(t * 8.0) * 4) if mouth != "closed" else 0
             captain = render_obep_captain(mood="alert", mouth_state=mouth, gesture="point_right", blink=blink, facing="right", scale=0.95)
             dir_boss = render_director(mood="shocked", mouth_state="closed", gesture="hands_on_head", blink=False, facing="left", holding_bill=False, scale=0.93)
-            frame = paste_char(frame, captain, 290, 1305)
-            frame = paste_char(frame, dir_boss, 840, 1305)
+            frame = paste_char(frame, captain, 290, 1305 + bob_c + talk_c)
+            frame = paste_char(frame, dir_boss, 840, 1305 + bob_d)
+            # Panic sweat on director's forehead
+            frame = draw_sweat_drops(frame, 895, 1010, t_local)
+            # Explosive door splinter burst particles in first 0.65s!
+            frame = draw_door_burst_particles(frame, t_local)
             # Flashing blue & red police lights
             frame = draw_siren_flash(frame, t)
             shake = ((1.0 - t_local / 0.5) ** 1.4) if t_local <= 0.5 else 0.0
             frame = camera.apply(frame, zoom=1.02 + 0.05 * p_ch, focal_point=(540, 1020), shake_intensity=shake, t=t)
             frame = draw_animated_stamp(frame, "ОБЭП! РУКИ НА СТОЛ!", t_local - 0.15, center=(540, 520))
+            if t_local > ch_dur - 2.5:
+                draw_compact_pill(frame, "СМОТРИ ФИНАЛ: ЧАСТЬ 5 — РАЗВЯЗКА В СЛЕДУЮЩЕЙ СЕРИИ!", y_pos=1620)
 
         # ================================================================
         # EPISODE 5: РАЗГРОМ РАЗВОДИЛ И 3 ПРАВИЛА
